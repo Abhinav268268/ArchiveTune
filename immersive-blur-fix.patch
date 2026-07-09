@@ -1,0 +1,15 @@
+--- a/app/src/main/kotlin/moe/rukamori/archivetune/ui/player/Player.kt
++++ b/app/src/main/kotlin/moe/rukamori/archivetune/ui/player/Player.kt
+@@ -2103,9 +2103,9 @@
+             Brush.verticalGradient(
+                 colorStops =
+                     arrayOf(
+-                        0f to backdropPalette.bottom,
+-                        V7BackdropFloorBlackStartFraction to backdropPalette.bottom,
+-                        1f to backdropPalette.bottom,
++                        0f to backdropPalette.bottom.copy(alpha = 0f),
++                        V7BackdropFloorBlackStartFraction to backdropPalette.bottom.copy(alpha = 0f),
++                        1f to backdropPalette.bottom.copy(alpha = 0.55f),
+                     ),
+             )
+         }
