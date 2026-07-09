@@ -2108,9 +2108,9 @@ private fun V7PlayerBackdrop(
             Brush.verticalGradient(
                 colorStops =
                     arrayOf(
-                        0f to backdropPalette.bottom,
-                        V7BackdropFloorBlackStartFraction to backdropPalette.bottom,
-                        1f to backdropPalette.bottom,
+                        0f to backdropPalette.bottom.copy(alpha = 0f),
+                        V7BackdropFloorBlackStartFraction to backdropPalette.bottom.copy(alpha = 0f),
+                        1f to backdropPalette.bottom.copy(alpha = 0.55f),
                     ),
             )
         }
