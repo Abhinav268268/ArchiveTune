@@ -93,11 +93,14 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -204,11 +207,8 @@ private const val V7BackdropMaxArtworkSizePx = 2_048
 private const val V7BackdropBlurDp = 44
 private const val V7BackdropBlurScale = 1.18f
 private const val V7BackdropArtworkOverscanFactor = 1.15f
-private const val V7SharpStagePortraitFraction = 0.62f
-private const val V7SharpStageLandscapeFraction = 0.58f
-private const val V7BackdropOverlapDp = 72
-private const val V7SharpStageBottomScrimStartFraction = 0.40f
-private const val V7BackdropFloorBlackStartFraction = 0.88f
+private const val V7SharpStagePortraitFraction = 0.65f
+private const val V7SharpStageLandscapeFraction = 0.60f
 private const val V8BackdropArtworkSizePx = 1_024
 
 @Stable
@@ -2088,32 +2088,34 @@ private fun V7PlayerBackdrop(
             backdropArtworkUrl?.resize(backdropArtworkSizePx, backdropArtworkSizePx)
         }
     val backdropArtworkRequest = rememberOfflineArtworkImageRequest(backdropArtworkModel)
-    val sharpStageBottomScrim =
-        remember(backdropPalette) {
-            val blendColor = backdropPalette.bottom
+
+    // The fade mask that dissolves the sharp artwork stage into the blurred backdrop
+    // beneath it — same trick Apple Music uses: the *clear* layer's own alpha ramps
+    // down at its bottom edge (via DstIn), rather than an opaque color block covering
+    // the blur underneath.
+    val sharpStageFadeMask =
+        remember {
             Brush.verticalGradient(
                 colorStops =
                     arrayOf(
-                        0f to Color.Transparent,
-                        V7SharpStageBottomScrimStartFraction to Color.Transparent,
-                        0.60f to blendColor.copy(alpha = 0.18f),
-                        0.76f to blendColor.copy(alpha = 0.52f),
-                        0.88f to blendColor.copy(alpha = 0.82f),
-                        1f to blendColor,
+                        0.00f to Color.Black,
+                        0.72f to Color.Black,
+                        0.90f to Color.Black.copy(alpha = 0.35f),
+                        1.00f to Color.Transparent,
                     ),
             )
         }
-    val backdropFloor =
-        remember(backdropPalette) {
+    // A gentle overall darkening so controls/text stay legible over bright artwork.
+    val depthOverlay =
+        remember {
             Brush.verticalGradient(
-                colorStops =
-                    arrayOf(
-                        0f to backdropPalette.bottom.copy(alpha = 0f),
-                        V7BackdropFloorBlackStartFraction to backdropPalette.bottom.copy(alpha = 0f),
-                        1f to backdropPalette.bottom.copy(alpha = 0.55f),
-                    ),
+                listOf(
+                    Color.Black.copy(alpha = 0.05f),
+                    Color.Black.copy(alpha = 0.38f),
+                ),
             )
         }
+
     val backdropBlurRadius = V7BackdropBlurDp.dp * (backdropBlurAmount.toFloat() / 100f)
     val needsBlur = !disableBlur && backdropBlurAmount > 0
     val backdropImageModifier =
@@ -2123,7 +2125,7 @@ private fun V7PlayerBackdrop(
                 .graphicsLayer {
                     scaleX = V7BackdropBlurScale
                     scaleY = V7BackdropBlurScale
-                    alpha = if (disableBlur || !needsBlur) 0.20f else 0.58f
+                    alpha = if (disableBlur || !needsBlur) 0.42f else 1f
                 }
         }
     val canvasStageModifier =
@@ -2136,7 +2138,7 @@ private fun V7PlayerBackdrop(
         modifier =
             modifier
                 .fillMaxSize()
-                .background(backdropPalette.top),
+                .background(backdropPalette.bottom),
     ) {
         val sharpStageFraction =
             if (configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
@@ -2145,58 +2147,42 @@ private fun V7PlayerBackdrop(
                 V7SharpStagePortraitFraction
             }
         val sharpStageHeight = maxHeight * sharpStageFraction
-        val sharpStageTopOffset = 0.dp
-        val sharpStageBottomOffset = sharpStageTopOffset + sharpStageHeight
-        val backdropTopOffset = (sharpStageBottomOffset - V7BackdropOverlapDp.dp).coerceAtLeast(0.dp)
-        val backdropHeight = maxHeight - backdropTopOffset
 
-        Box(
-            modifier =
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .height(backdropHeight)
-                    .clipToBounds()
-                    .background(backdropPalette.bottom),
-        ) {
-            if (backdropArtworkModel != null) {
-                if (needsBlur && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    AsyncImage(
-                        model = backdropArtworkRequest,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = backdropImageModifier.blur(backdropBlurRadius),
-                    )
-                } else if (needsBlur) {
-                    BackdropBlurApi30(
-                        model = backdropArtworkModel,
-                        blurAmount = backdropBlurAmount,
-                        modifier =
-                            Modifier
-                                .fillMaxSize()
-                                .graphicsLayer {
-                                    scaleX = V7BackdropBlurScale
-                                    scaleY = V7BackdropBlurScale
-                                    alpha = 0.58f
-                                },
-                    )
-                } else {
-                    AsyncImage(
-                        model = backdropArtworkRequest,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = backdropImageModifier,
-                    )
-                }
+        // Layer 1: full-screen blurred artwork — this is what shows through once the
+        // sharp stage above fades out, so it must cover the whole backdrop, not just
+        // the area below the sharp stage.
+        if (backdropArtworkModel != null) {
+            if (needsBlur && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                AsyncImage(
+                    model = backdropArtworkRequest,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = backdropImageModifier.blur(backdropBlurRadius),
+                )
+            } else if (needsBlur) {
+                BackdropBlurApi30(
+                    model = backdropArtworkModel,
+                    blurAmount = backdropBlurAmount,
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                scaleX = V7BackdropBlurScale
+                                scaleY = V7BackdropBlurScale
+                                alpha = 1f
+                            },
+                )
+            } else {
+                AsyncImage(
+                    model = backdropArtworkRequest,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = backdropImageModifier,
+                )
             }
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .background(backdropFloor),
-            )
         }
 
+        // Layer 2: the sharp artwork stage, dissolving into Layer 1 at its bottom edge.
         AnimatedContent(
             targetState = backdropState,
             transitionSpec = {
@@ -2206,10 +2192,13 @@ private fun V7PlayerBackdrop(
             modifier =
                 Modifier
                     .align(Alignment.TopCenter)
-                    .offset(y = sharpStageTopOffset)
                     .fillMaxWidth()
                     .height(sharpStageHeight)
-                    .clipToBounds(),
+                    .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+                    .drawWithContent {
+                        drawContent()
+                        drawRect(brush = sharpStageFadeMask, blendMode = BlendMode.DstIn)
+                    },
         ) { backdrop ->
             val sharpArtworkModel =
                 remember(backdrop.artworkUrl, backdropArtworkSizePx) {
@@ -2218,10 +2207,7 @@ private fun V7PlayerBackdrop(
             val sharpArtworkRequest = rememberOfflineArtworkImageRequest(sharpArtworkModel)
 
             Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .background(backdropPalette.top),
+                modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
                 if (sharpArtworkModel != null) {
@@ -2245,14 +2231,12 @@ private fun V7PlayerBackdrop(
             }
         }
 
+        // Layer 3: subtle depth gradient over everything for legibility.
         Box(
             modifier =
                 Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = sharpStageTopOffset)
-                    .fillMaxWidth()
-                    .height(sharpStageHeight)
-                    .background(sharpStageBottomScrim),
+                    .fillMaxSize()
+                    .background(depthOverlay),
         )
     }
 }
