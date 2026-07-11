@@ -94,6 +94,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
@@ -314,7 +315,7 @@ fun BottomSheetPlayer(
         defaultValue = PlayerBackgroundStyle.DEFAULT,
     )
     val playerUsesFixedBackground =
-        playerDesignStyle == PlayerDesignStyle.V8 || playerDesignStyle == PlayerDesignStyle.V9
+        playerDesignStyle == PlayerDesignStyle.V8 || playerDesignStyle == PlayerDesignStyle.V9 || playerDesignStyle == PlayerDesignStyle.V10
     val playerBackground =
         if (playerUsesFixedBackground) PlayerBackgroundStyle.DEFAULT else storedPlayerBackground
 
@@ -529,7 +530,7 @@ fun BottomSheetPlayer(
     val changeBound = state.expandedBound / 3
 
     val TextBackgroundColor =
-        if (playerDesignStyle == PlayerDesignStyle.V7 || playerDesignStyle == PlayerDesignStyle.V8) {
+        if (playerDesignStyle == PlayerDesignStyle.V7 || playerDesignStyle == PlayerDesignStyle.V8 || playerDesignStyle == PlayerDesignStyle.V10) {
             Color.White
         } else {
             when (playerBackground) {
@@ -545,7 +546,7 @@ fun BottomSheetPlayer(
         }
 
     val icBackgroundColor =
-        if (playerDesignStyle == PlayerDesignStyle.V7 || playerDesignStyle == PlayerDesignStyle.V8) {
+        if (playerDesignStyle == PlayerDesignStyle.V7 || playerDesignStyle == PlayerDesignStyle.V8 || playerDesignStyle == PlayerDesignStyle.V10) {
             Color.Black
         } else {
             when (playerBackground) {
@@ -573,7 +574,7 @@ fun BottomSheetPlayer(
                 )
             }
         }.let { (tb, ib) ->
-            if (playerDesignStyle == PlayerDesignStyle.V7 || playerDesignStyle == PlayerDesignStyle.V8) {
+            if (playerDesignStyle == PlayerDesignStyle.V7 || playerDesignStyle == PlayerDesignStyle.V8 || playerDesignStyle == PlayerDesignStyle.V10) {
                 Pair(Color.White, Color.Black)
             } else {
                 Pair(tb, ib)
@@ -879,7 +880,7 @@ fun BottomSheetPlayer(
                     }
                 },
         backgroundColor =
-            if (playerDesignStyle == PlayerDesignStyle.V7 || playerDesignStyle == PlayerDesignStyle.V8) {
+            if (playerDesignStyle == PlayerDesignStyle.V7 || playerDesignStyle == PlayerDesignStyle.V8 || playerDesignStyle == PlayerDesignStyle.V10) {
                 val progress =
                     ((state.value - state.collapsedBound) / (state.expandedBound - state.collapsedBound))
                         .coerceIn(0f, 1f)
@@ -1135,7 +1136,8 @@ fun BottomSheetPlayer(
             playerDesignStyle != PlayerDesignStyle.V5 &&
             playerDesignStyle != PlayerDesignStyle.V7 &&
             playerDesignStyle != PlayerDesignStyle.V8 &&
-            playerDesignStyle != PlayerDesignStyle.V9
+            playerDesignStyle != PlayerDesignStyle.V9 &&
+            playerDesignStyle != PlayerDesignStyle.V10
         ) {
             PlayerBackground(
                 playerBackground = playerBackground,
@@ -1386,6 +1388,60 @@ fun BottomSheetPlayer(
                                         ),
                                     ).nestedScroll(state.preUpPostDownNestedScrollConnection),
                         )
+                    }
+                } else if (playerDesignStyle == PlayerDesignStyle.V10) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        val v10SwapState =
+                            rememberThumbnailSwapState(
+                                videoId = mediaMetadata?.id,
+                                ytmUrl = mediaMetadata?.thumbnailUrl,
+                                lowDataMode = lowDataModeActive,
+                                isMusicVideo = mediaMetadata?.isMusicVideo ?: false,
+                            )
+                        V10PlayerBackdrop(
+                            thumbnailUrl = v10SwapState.displayUrl,
+                            disableBlur = disableBlur,
+                            backdropBlurAmount = backdropBlurAmount,
+                            label = "v10BackdropLandscape",
+                        )
+
+                        enrichedMetadata?.let { metadata ->
+                            V10PlayerControlsContent(
+                                mediaMetadata = metadata,
+                                playbackState = playbackState,
+                                isPlaying = isPlaying,
+                                isLoading = isLoading,
+                                canSkipPrevious = canSkipPrevious,
+                                canSkipNext = canSkipNext,
+                                currentSongLiked = currentSongLiked,
+                                sliderPosition = sliderPosition,
+                                position = position,
+                                duration = duration,
+                                volume = deviceMusicVolumeController.volumeFraction,
+                                currentFormat = currentFormat,
+                                playerConnection = playerConnection,
+                                navController = navController,
+                                state = state,
+                                menuState = menuState,
+                                bottomSheetPageState = bottomSheetPageState,
+                                onSliderValueChange = onSliderValueChange,
+                                onSliderValueChangeFinished = onSliderValueChangeFinished,
+                                onVolumeChange = onPlayerVolumeChange,
+                                nextUpMetadata = nextUpMetadata,
+                                onExpandQueue = openQueue,
+                                modifier =
+                                    Modifier
+                                        .fillMaxSize()
+                                        .padding(bottom = queueSheetState.collapsedBound)
+                                        .windowInsetsPadding(
+                                            WindowInsets.systemBars.only(
+                                                WindowInsetsSides.Top + WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom,
+                                            ),
+                                        ).nestedScroll(state.preUpPostDownNestedScrollConnection),
+                            )
+                        }
                     }
                 } else {
                     Row(
@@ -1658,6 +1714,60 @@ fun BottomSheetPlayer(
                                     ).nestedScroll(state.preUpPostDownNestedScrollConnection),
                         )
                     }
+                } else if (playerDesignStyle == PlayerDesignStyle.V10) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        val v10SwapState =
+                            rememberThumbnailSwapState(
+                                videoId = mediaMetadata?.id,
+                                ytmUrl = mediaMetadata?.thumbnailUrl,
+                                lowDataMode = lowDataModeActive,
+                                isMusicVideo = mediaMetadata?.isMusicVideo ?: false,
+                            )
+                        V10PlayerBackdrop(
+                            thumbnailUrl = v10SwapState.displayUrl,
+                            disableBlur = disableBlur,
+                            backdropBlurAmount = backdropBlurAmount,
+                            label = "v10BackdropPortrait",
+                        )
+
+                        enrichedMetadata?.let { metadata ->
+                            V10PlayerControlsContent(
+                                mediaMetadata = metadata,
+                                playbackState = playbackState,
+                                isPlaying = isPlaying,
+                                isLoading = isLoading,
+                                canSkipPrevious = canSkipPrevious,
+                                canSkipNext = canSkipNext,
+                                currentSongLiked = currentSongLiked,
+                                sliderPosition = sliderPosition,
+                                position = position,
+                                duration = duration,
+                                volume = deviceMusicVolumeController.volumeFraction,
+                                currentFormat = currentFormat,
+                                playerConnection = playerConnection,
+                                navController = navController,
+                                state = state,
+                                menuState = menuState,
+                                bottomSheetPageState = bottomSheetPageState,
+                                onSliderValueChange = onSliderValueChange,
+                                onSliderValueChangeFinished = onSliderValueChangeFinished,
+                                onVolumeChange = onPlayerVolumeChange,
+                                nextUpMetadata = nextUpMetadata,
+                                onExpandQueue = openQueue,
+                                modifier =
+                                    Modifier
+                                        .fillMaxSize()
+                                        .padding(bottom = queueSheetState.collapsedBound)
+                                        .windowInsetsPadding(
+                                            WindowInsets.systemBars.only(
+                                                WindowInsetsSides.Top + WindowInsetsSides.Horizontal,
+                                            ),
+                                        ).nestedScroll(state.preUpPostDownNestedScrollConnection),
+                            )
+                        }
+                    }
                 } else {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -1904,6 +2014,124 @@ private fun V8PlayerBackdrop(
                 Modifier
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.52f)),
+        )
+    }
+}
+
+/**
+ * V10 "Apple Music" backdrop — ported to match OpenTune's V8 Apple Music design:
+ * a sharp, slightly scaled base layer; a blurred layer that's transparent near
+ * the top and solidifies toward the bottom (via a DstIn alpha mask); and a
+ * strong bottom-heavy dark gradient on top, matching Apple Music's look.
+ */
+@Composable
+private fun V10PlayerBackdrop(
+    thumbnailUrl: String?,
+    disableBlur: Boolean,
+    backdropBlurAmount: Int,
+    label: String,
+    modifier: Modifier = Modifier,
+) {
+    val backdropModel =
+        remember(thumbnailUrl) {
+            thumbnailUrl?.resize(V8BackdropArtworkSizePx, V8BackdropArtworkSizePx)
+        }
+    val backdropRequest = rememberOfflineArtworkImageRequest(backdropModel)
+    val needsBlur = !disableBlur && backdropBlurAmount > 0
+    val blurRadiusDp = V7BackdropBlurDp.dp * (backdropBlurAmount.toFloat() / 100f)
+    val baseArtworkScale = if (disableBlur) 1.02f else 1.05f
+    val baseArtworkAlpha = if (disableBlur) 0.65f else 0.75f
+    val blurMask =
+        remember {
+            Brush.verticalGradient(
+                colorStops =
+                    arrayOf(
+                        0.00f to Color.Transparent,
+                        0.42f to Color.Transparent,
+                        0.55f to Color.Black.copy(alpha = 0.5f),
+                        0.72f to Color.Black,
+                        1.00f to Color.Black,
+                    ),
+            )
+        }
+    val depthOverlay =
+        remember {
+            Brush.verticalGradient(
+                colorStops =
+                    arrayOf(
+                        0.00f to Color.Transparent,
+                        0.15f to Color.Black.copy(alpha = 0.05f),
+                        0.45f to Color.Black.copy(alpha = 0.25f),
+                        0.70f to Color.Black.copy(alpha = 0.50f),
+                        1.00f to Color.Black.copy(alpha = 0.85f),
+                    ),
+            )
+        }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        AnimatedContent(
+            targetState = thumbnailUrl,
+            transitionSpec = {
+                fadeIn(tween(800)) togetherWith fadeOut(tween(800))
+            },
+            label = label,
+        ) { artworkUrl ->
+            if (artworkUrl != null) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    AsyncImage(
+                        model = backdropRequest,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    scaleX = baseArtworkScale
+                                    scaleY = baseArtworkScale
+                                    alpha = baseArtworkAlpha
+                                },
+                    )
+
+                    if (needsBlur) {
+                        val blurredModifier =
+                            Modifier
+                                .fillMaxSize()
+                                .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+                                .drawWithContent {
+                                    drawContent()
+                                    drawRect(brush = blurMask, blendMode = BlendMode.DstIn)
+                                }
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            AsyncImage(
+                                model = backdropRequest,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = blurredModifier.blur(blurRadiusDp),
+                            )
+                        } else {
+                            BackdropBlurApi30(
+                                model = backdropModel,
+                                blurAmount = backdropBlurAmount,
+                                modifier = blurredModifier,
+                            )
+                        }
+                    }
+                }
+            } else {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .background(Color.Black),
+                )
+            }
+        }
+
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(depthOverlay),
         )
     }
 }

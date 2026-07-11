@@ -28,6 +28,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -632,7 +633,7 @@ fun PlayerTopActions(
             }
         }
 
-        PlayerDesignStyle.V7, PlayerDesignStyle.V8, PlayerDesignStyle.V9 -> {
+        PlayerDesignStyle.V7, PlayerDesignStyle.V8, PlayerDesignStyle.V9, PlayerDesignStyle.V10 -> {
             Unit
         }
     }
@@ -1691,7 +1692,7 @@ fun PlayerPlaybackControls(
             }
         }
 
-        PlayerDesignStyle.V7, PlayerDesignStyle.V8, PlayerDesignStyle.V9 -> {
+        PlayerDesignStyle.V7, PlayerDesignStyle.V8, PlayerDesignStyle.V9, PlayerDesignStyle.V10 -> {
             Unit
         }
     }
@@ -2908,6 +2909,479 @@ private fun V8FlatSlider(
         },
         modifier = modifier.height(30.dp),
     )
+}
+
+/**
+ * V10 "Apple Music" theme — ported to match OpenTune's V8 Apple Music design:
+ * translucent frosted "glass" slider track, borderless circular transport
+ * buttons, and an Up Next preview row.
+ */
+@Composable
+fun V10GlassTrack(
+    fraction: Float,
+    trackHeight: Dp,
+    tint: Color,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(50)
+    Box(
+        modifier =
+            modifier
+                .height(trackHeight)
+                .clip(shape),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .matchParentSize()
+                    .blur(radius = 6.dp)
+                    .background(tint.copy(alpha = 0.16f)),
+        )
+        Box(
+            modifier =
+                Modifier
+                    .matchParentSize()
+                    .border(width = 0.75.dp, color = tint.copy(alpha = 0.3f), shape = shape),
+        )
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(fraction.coerceIn(0f, 1f))
+                    .clip(shape)
+                    .background(
+                        Brush.verticalGradient(
+                            colors =
+                                listOf(
+                                    tint.copy(alpha = 0.95f),
+                                    tint.copy(alpha = 0.75f),
+                                ),
+                        ),
+                    ),
+        )
+    }
+}
+
+@Composable
+fun V10PlaybackControls(
+    playbackState: Int,
+    isPlaying: Boolean,
+    isLoading: Boolean,
+    canSkipPrevious: Boolean,
+    canSkipNext: Boolean,
+    foreground: Color,
+    playerConnection: PlayerConnection,
+) {
+    Row(
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = PlayerHorizontalPadding),
+    ) {
+        Surface(
+            onClick = { playerConnection.seekToPrevious() },
+            enabled = canSkipPrevious,
+            shape = CircleShape,
+            color = Color.Transparent,
+            modifier = Modifier.size(56.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                Icon(
+                    painter = painterResource(R.drawable.skip_previous),
+                    contentDescription = null,
+                    tint = foreground.copy(alpha = if (canSkipPrevious) 1f else 0.4f),
+                    modifier = Modifier.size(38.dp),
+                )
+            }
+        }
+
+        Surface(
+            onClick = {
+                if (playbackState == STATE_ENDED) {
+                    playerConnection.player.seekTo(0, 0)
+                    playerConnection.player.playWhenReady = true
+                } else {
+                    playerConnection.player.togglePlayPause()
+                }
+            },
+            shape = CircleShape,
+            color = Color.Transparent,
+            modifier = Modifier.size(72.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                if (isLoading) {
+                    CircularWavyProgressIndicator(
+                        modifier = Modifier.size(36.dp),
+                        color = foreground,
+                    )
+                } else {
+                    Icon(
+                        painter =
+                            painterResource(
+                                when {
+                                    playbackState == STATE_ENDED -> R.drawable.replay
+                                    isPlaying -> R.drawable.pause
+                                    else -> R.drawable.play
+                                },
+                            ),
+                        contentDescription = null,
+                        tint = foreground,
+                        modifier = Modifier.size(48.dp),
+                    )
+                }
+            }
+        }
+
+        Surface(
+            onClick = { playerConnection.seekToNext() },
+            enabled = canSkipNext,
+            shape = CircleShape,
+            color = Color.Transparent,
+            modifier = Modifier.size(56.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                Icon(
+                    painter = painterResource(R.drawable.skip_next),
+                    contentDescription = null,
+                    tint = foreground.copy(alpha = if (canSkipNext) 1f else 0.4f),
+                    modifier = Modifier.size(38.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun V10VolumeSlider(
+    volume: Float,
+    onVolumeChange: (Float) -> Unit,
+    activeColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = modifier,
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.volume_off),
+            contentDescription = null,
+            tint = activeColor.copy(alpha = 0.6f),
+            modifier = Modifier.size(16.dp),
+        )
+
+        Slider(
+            value = volume,
+            valueRange = 0f..1f,
+            onValueChange = onVolumeChange,
+            colors = PlayerSliderColors.thickSliderColors(activeColor),
+            thumb = { Spacer(modifier = Modifier.size(0.dp)) },
+            track = { sliderState ->
+                val fraction =
+                    ((sliderState.value - sliderState.valueRange.start) /
+                        (sliderState.valueRange.endInclusive - sliderState.valueRange.start))
+                        .coerceIn(0f, 1f)
+                V10GlassTrack(
+                    fraction = fraction,
+                    trackHeight = 10.dp,
+                    tint = activeColor,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            modifier = Modifier.weight(1f),
+        )
+
+        Icon(
+            painter = painterResource(R.drawable.volume_up),
+            contentDescription = null,
+            tint = activeColor.copy(alpha = 0.6f),
+            modifier = Modifier.size(22.dp),
+        )
+    }
+}
+
+@Composable
+fun V10PlayerControlsContent(
+    mediaMetadata: MediaMetadata,
+    playbackState: Int,
+    isPlaying: Boolean,
+    isLoading: Boolean,
+    canSkipPrevious: Boolean,
+    canSkipNext: Boolean,
+    currentSongLiked: Boolean,
+    sliderPosition: Long?,
+    position: Long,
+    duration: Long,
+    volume: Float,
+    currentFormat: FormatEntity?,
+    playerConnection: PlayerConnection,
+    navController: NavController,
+    state: BottomSheetState,
+    menuState: MenuState,
+    bottomSheetPageState: BottomSheetPageState,
+    onSliderValueChange: (Long) -> Unit,
+    onSliderValueChangeFinished: () -> Unit,
+    onVolumeChange: (Float) -> Unit,
+    nextUpMetadata: MediaMetadata? = null,
+    onExpandQueue: () -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
+    val foreground = Color.White
+    val titleActions = rememberPlayerTitleActions(mediaMetadata, navController, state)
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = PlayerHorizontalPadding),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                AnimatedContent(
+                    targetState = mediaMetadata.title,
+                    transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(300)) },
+                    label = "v10_title",
+                ) { title ->
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = foreground,
+                        modifier =
+                            Modifier
+                                .basicMarquee()
+                                .clickable(onClick = titleActions.onTitleClick),
+                    )
+                }
+
+                Spacer(Modifier.height(6.dp))
+
+                val artistsText =
+                    remember(mediaMetadata.artists) {
+                        mediaMetadata.artists.joinToString(separator = ", ") { it.name }
+                    }
+                AnimatedContent(
+                    targetState = artistsText,
+                    transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(300)) },
+                    label = "v10_artist",
+                ) { artists ->
+                    Text(
+                        text = artists,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = foreground.copy(alpha = 0.7f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier =
+                            Modifier
+                                .basicMarquee()
+                                .clickable(onClick = titleActions.onArtistClick),
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (currentSongLiked) foreground.copy(alpha = 0.2f) else Color.Transparent,
+                            ).clickable { playerConnection.toggleLike() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painter =
+                            painterResource(
+                                if (currentSongLiked) R.drawable.favorite else R.drawable.favorite_border,
+                            ),
+                        contentDescription = null,
+                        tint = foreground.copy(alpha = if (currentSongLiked) 1f else 0.7f),
+                        modifier = Modifier.size(30.dp),
+                    )
+                }
+
+                Box(
+                    modifier =
+                        Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .clickable {
+                                menuState.show {
+                                    PlayerMenu(
+                                        mediaMetadata = mediaMetadata,
+                                        navController = navController,
+                                        playerBottomSheetState = state,
+                                        onShowDetailsDialog = {
+                                            bottomSheetPageState.show {
+                                                ShowMediaInfo(mediaMetadata.id)
+                                            }
+                                        },
+                                        onDismiss = menuState::dismiss,
+                                    )
+                                }
+                            },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.more_horiz),
+                        contentDescription = null,
+                        tint = foreground.copy(alpha = 0.7f),
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(10.dp))
+
+        val safeDuration = if (duration <= 0L) 0f else duration.toFloat()
+        val safeValue = (sliderPosition ?: position).toFloat().coerceIn(0f, maxOf(0f, safeDuration))
+        Slider(
+            value = safeValue,
+            valueRange = 0f..maxOf(1f, safeDuration),
+            onValueChange = { onSliderValueChange(it.toLong()) },
+            onValueChangeFinished = onSliderValueChangeFinished,
+            colors = PlayerSliderColors.thickSliderColors(foreground),
+            thumb = { Spacer(modifier = Modifier.size(0.dp)) },
+            track = { sliderState ->
+                val fraction =
+                    ((sliderState.value - sliderState.valueRange.start) /
+                        (sliderState.valueRange.endInclusive - sliderState.valueRange.start))
+                        .coerceIn(0f, 1f)
+                V10GlassTrack(
+                    fraction = fraction,
+                    trackHeight = 10.dp,
+                    tint = foreground,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = PlayerHorizontalPadding),
+        )
+
+        Spacer(Modifier.height(4.dp))
+
+        PlayerTimeLabel(
+            sliderPosition = sliderPosition,
+            position = position,
+            duration = duration,
+            textBackgroundColor = foreground,
+            showRemainingTime = true,
+            centerContent =
+                currentFormat?.let { format ->
+                    {
+                        val codec = format.mimeType.substringAfter("/").uppercase()
+                        val label =
+                            when {
+                                codec.contains("FLAC") || codec.contains("ALAC") -> "Lossless"
+                                codec.contains("OPUS") -> codec
+                                codec.contains("AAC") -> codec
+                                codec.contains("MP4A") -> "AAC"
+                                codec.contains("VORBIS") -> "Vorbis"
+                                else -> codec
+                            }
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = foreground.copy(alpha = 0.12f),
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.graphic_eq),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = foreground.copy(alpha = 0.8f),
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = foreground.copy(alpha = 0.8f),
+                                )
+                            }
+                        }
+                    }
+                },
+        )
+
+        if (nextUpMetadata != null) {
+            Spacer(Modifier.height(6.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { onExpandQueue() }
+                        .padding(horizontal = PlayerHorizontalPadding, vertical = 2.dp),
+            ) {
+                AsyncImage(
+                    model = nextUpMetadata.thumbnailUrl?.highRes(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier =
+                        Modifier
+                            .size(18.dp)
+                            .clip(RoundedCornerShape(4.dp)),
+                )
+                Text(
+                    text = stringResource(R.string.player_v10_up_next, nextUpMetadata.title),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = foreground.copy(alpha = 0.55f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier =
+                        Modifier
+                            .weight(1f, fill = false)
+                            .basicMarquee(),
+                )
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+
+        V10PlaybackControls(
+            playbackState = playbackState,
+            isPlaying = isPlaying,
+            isLoading = isLoading,
+            canSkipPrevious = canSkipPrevious,
+            canSkipNext = canSkipNext,
+            foreground = foreground,
+            playerConnection = playerConnection,
+        )
+
+        Spacer(Modifier.height(14.dp))
+
+        V10VolumeSlider(
+            volume = volume,
+            onVolumeChange = onVolumeChange,
+            activeColor = foreground,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = PlayerHorizontalPadding + 8.dp),
+        )
+    }
 }
 
 @Composable
