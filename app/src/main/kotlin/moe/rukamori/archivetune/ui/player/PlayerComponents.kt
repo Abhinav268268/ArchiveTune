@@ -3183,7 +3183,11 @@ fun V10PlayerControlsContent(
                         modifier =
                             Modifier
                                 .basicMarquee()
-                                .clickable(onClick = titleActions.onArtistClick),
+                                .clickable {
+                                    titleActions.onArtistClick(
+                                        mediaMetadata.artists.firstOrNull()?.id.orEmpty(),
+                                    )
+                                },
                     )
                 }
             }
